@@ -4,7 +4,8 @@ from config import Config
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 import telebot
-from telebot import types
+from flask_sslify import SSLify
+from telebot import types, apihelper
 import config
 
 bot = telebot.TeleBot(config.TOKEN, threaded=False)
@@ -12,8 +13,14 @@ server = Flask(__name__)
 server.config.from_object(Config)
 db = SQLAlchemy(server)
 migrate = Migrate(server, db)
+sslify = SSLify(server)
 
-from app import models, routes
+from app import models
+
+apihelper.proxy = {
+    'http': 'socks5://127.0.0.1:9150',
+    'https': 'socks5://127.0.0.1:9150'
+}
 
 @bot.message_handler(content_types=["text"])
 def repeat_all_messages(message):
@@ -37,11 +44,15 @@ def register(call):
 def login(call):
     bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text='666')
 
+@server.route("/" + config.TOKEN, methods=['POST'])
+def getMessage():
+    bot.process_new_updates([telebot.types.Update.de_json(request.stream.read().decode("utf-8"))])
+    return "!", 200
 
 @server.route("/")
 def webhook():
     bot.remove_webhook()
-    bot.set_webhook(url='' + config.TOKEN)
+    bot.set_webhook(url='https://109.63.196.181:5000/' + config.TOKEN)
     return "!", 200
 
 
